@@ -15,11 +15,13 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from vikpred.config import REPORTS_DIR, TEAM, current_season
 from vikpred.features.build import FEATURE_LABELS
 from vikpred.models.xgb import explain_for_team
+from vikpred.news.collect import load_team_news
+from vikpred.teams import TEAM_NAMES
 from vikpred.serving.job import MODEL_NAMES
 from vikpred.serving.store import LocalParquetStore, PredictionStore
 
 from vikpred.api.schemas import (  # noqa: I001
-    Factor, GameDetail, GameSummary, Health, ModelInfo, ModelPrediction, Record,
+    Factor, GameDetail, GameSummary, Health, ModelInfo, ModelPrediction, Record, TeamNews,
 )
 
 app = FastAPI(
@@ -198,3 +200,15 @@ def record(team: str, season: int | None = None, live_only: bool = False,
 def features():
     """Plain-English meaning of every feature the models use."""
     return {k: label for k, (label, _) in FEATURE_LABELS.items()}
+
+
+@app.get("/teams/{team}/news", response_model=TeamNews)
+def team_news(team: str):
+    """This week's facts (nflverse) and headlines (allow-listed feeds) for one team. Refreshed daily."""
+    team = team.upper()
+    if team not in TEAM_NAMES:
+        raise HTTPException(404, f"Unknown team '{team}'")
+    news = load_team_news(team)
+    if news is None:
+        raise HTTPException(404, "No news collected yet. Run `python -m vikpred.news.collect` or the daily job.")
+    return news

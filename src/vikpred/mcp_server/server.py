@@ -108,6 +108,28 @@ def get_team_record(team: str = "MIN", season: int | None = None, live_only: boo
 
 
 @server.tool()
+def get_team_news(team: str = "MIN") -> dict:
+    """Get a team's facts for this week from nflverse: the injury report for its upcoming
+    game, roster moves (signings, releases, IR, practice squad), trades, and head-coach
+    changes. Facts marked in_model=true are already counted by the prediction models.
+    News headlines are not included (see the note in the result).
+
+    Args:
+        team: NFL team abbreviation. Defaults to the Vikings.
+    """
+    news = _get(f"/teams/{team}/news")
+    # Headlines come from publishers whose terms (ESPN/Disney, PMC) prohibit use with AI
+    # tools, so they stay on the dashboard and never reach the model.
+    return {
+        "team": news["team"],
+        "generated_at": news["generated_at"],
+        "facts": news["facts"],
+        "note": (f"{len(news['headlines'])} recent headlines are shown on the dashboard's news panel. "
+                 "They aren't available here because the publishers' terms don't allow AI processing."),
+    }
+
+
+@server.tool()
 def get_model_info() -> dict:
     """Get model versions and their 2024-2025 test-set metrics (log loss, Brier, accuracy,
     calibration error) next to the Vegas and always-pick-home baselines."""

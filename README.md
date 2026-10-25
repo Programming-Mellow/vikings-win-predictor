@@ -4,7 +4,7 @@
 
 **Weekly NFL win probabilities from machine learning, explained by a Claude-powered assistant that grows with your football knowledge.**
 
-[![CI](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white) ![Tests](https://img.shields.io/badge/tests-65%20passing-2EA44F?logo=pytest&logoColor=white) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white) ![Tests](https://img.shields.io/badge/tests-92%20passing-2EA44F?logo=pytest&logoColor=white) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 ![XGBoost](https://img.shields.io/badge/XGBoost-SHAP-EB5B00) ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white) ![Polars](https://img.shields.io/badge/Polars-CD792C?logo=polars&logoColor=white) ![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white) ![Claude](https://img.shields.io/badge/Claude-Sonnet%205.5-D97757?logo=anthropic&logoColor=white) ![MCP](https://img.shields.io/badge/MCP-server-000000?logo=modelcontextprotocol&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 
@@ -29,10 +29,11 @@ The project is built like a production service: leakage-safe features, honest ev
 |---|---|
 | 🎯 **Calibrated predictions** | Two XGBoost models: *stats + Vegas line* (statistically ties the betting market) and *stats only* (an independent football view) |
 | 🔍 **Explainable** | Every prediction ships with SHAP factors (e.g. "recent point differential +0.57, offensive success rate −0.14") |
-| 🤖 **AI assistant over MCP** | Claude Sonnet 5.5 calls 6 MCP tools for live numbers. Usable from the app, Claude Desktop, or Claude Code |
+| 🤖 **AI assistant over MCP** | Claude Sonnet 5.5 calls 7 MCP tools for live numbers. Usable from the app, Claude Desktop, or Claude Code |
 | 📈 **Grows with you** | Beginner / Fan / Analyst levels plus a learned profile: new concepts get explained once, then used freely |
+| 📰 **Weekly team news** | Injury reports, roster moves, trades and coaching changes from nflverse, each tagged *may help / may hurt* by Claude Haiku and marked *already in the model* or not; plus headlines from Vikings.com, Daily Norseman, ESPN and Yahoo, shown as published |
 | 🔒 **Honest tracking** | Pre-game predictions are locked at kickoff; a season tracker scores model vs. Vegas with a live-only toggle |
-| 🐳 **Production-ready** | FastAPI service, scheduled refresh job, Docker Compose, GitHub Actions CI, 65 offline tests |
+| 🐳 **Production-ready** | FastAPI service, scheduled refresh job, Docker Compose, GitHub Actions CI, 92 offline tests |
 
 ## 🏗️ Architecture
 
@@ -202,7 +203,7 @@ Claude Desktop (`claude_desktop_config.json`):
 <details>
 <summary><b>AI assistant: Claude, MCP, and adaptive learning</b></summary>
 
-- **MCP server:** 6 tools over the API (`get_next_game`, `get_game`, `get_team_schedule`, `get_team_record`, `get_model_info`, `get_feature_glossary`). API errors come back as messages the model can act on.
+- **MCP server:** 7 tools over the API (`get_next_game`, `get_game`, `get_team_schedule`, `get_team_record`, `get_team_news`, `get_model_info`, `get_feature_glossary`). API errors come back as messages the model can act on.
 - **Agent loop:** streamed responses from Claude Sonnet 5.5 at low effort.
   - The system prompt and tools are prompt-cached.
   - Streamed tool inputs are validated against each tool's schema.
@@ -212,6 +213,27 @@ Claude Desktop (`claude_desktop_config.json`):
 - **Adaptive learning:**
   - Your level (Beginner / Fan / Analyst) and a learned profile (concepts you know, are learning, and care about) shape how deep each answer goes.
   - The profile reaches Claude as a **mid-conversation system message**, sent only when it changes. That keeps the history append-only, which Claude Sonnet 5.5 requires.
+
+</details>
+
+<details>
+<summary><b>Team news: sources, terms, and what the AI sees</b></summary>
+
+The daily job collects each team's news into `data/news/{TEAM}.json`, served at `/teams/{team}/news`:
+
+- **Facts from nflverse (open data):**
+  - the injury report for the team's *upcoming* game, so last week's stale report isn't shown
+  - roster moves found by comparing the last two weekly rosters (game-day inactives ignored)
+  - trades from the last 3 weeks
+  - head-coach changes
+  
+  Whether a fact is **already in the model** is computed in code: the features count key starters and QBs ruled Out. Claude Haiku tags each fact *may help / may hurt / no effect* with a short reason, and can only tag the facts it was given.
+- **Headlines** come from an allow-list checked for availability, `robots.txt`, and each publisher's terms ([`sources.py`](src/vikpred/news/sources.py)):
+  - **Vikings-specific:** Vikings.com (official) and Daily Norseman
+  - **National**, filtered by team name: ESPN and Yahoo Sports
+  - **Excluded after review:** ProFootballTalk (terms bar automated aggregation), CBS Sports (sportsbook promos), and NFL.com (no feed)
+- **Display only, never sent to an AI.** ESPN's (Disney) and PMC's terms prohibit using their content with AI tools, so headlines are shown exactly as published, with credit and a link. They never go to Claude, including through the chat's `get_team_news` MCP tool. Plain keyword rules, not AI, add category badges (Injury, Trade, Coaching, Suspension, Roster move), and betting content is filtered out.
+- **Polite and free:** each feed is fetched once a day with a descriptive user agent, there are no paid search APIs, and a failing source is skipped without breaking the rest.
 
 </details>
 
@@ -225,6 +247,7 @@ Claude Desktop (`claude_desktop_config.json`):
 | 4 | ✅ | [Prediction API](https://github.com/Programming-Mellow/vikings-win-predictor/pull/3) | FastAPI, scheduled job, locking of pre-game predictions |
 | 5 | ✅ | [Claude assistant over MCP](https://github.com/Programming-Mellow/vikings-win-predictor/pull/4) | MCP server, streamed tool-using agent, Streamlit dashboard |
 | 6 | ✅ | [Adaptive assistant, Docker, CI](https://github.com/Programming-Mellow/vikings-win-predictor/pull/5) | Learner profile, season tracker, Docker Compose, GitHub Actions |
+| + | ✅ | [Prediction banner + Haiku bullets](https://github.com/Programming-Mellow/vikings-win-predictor/pull/7) | Plain-English verdict and grounded "why" bullets for every team |
 | 7 | 📝 TODO | Cloud deployment (future) | AWS via CloudFormation: S3, EventBridge, ECS/App Runner, Amazon Bedrock |
 
 ## 📁 Project structure
@@ -241,9 +264,10 @@ Claude Desktop (`claude_desktop_config.json`):
 │   ├── serving/             scheduled prediction job + storage
 │   ├── api/                 FastAPI app + Pydantic schemas
 │   ├── mcp_server/          MCP tools over the API
-│   ├── llm/                 Claude agent, MCP client, learner profile
+│   ├── llm/                 Claude agent, MCP client, learner profile, Haiku insights
+│   ├── news/                team news: nflverse facts + allow-listed RSS feeds
 │   └── tracker.py           season tracker math
-├── tests/                   65 offline tests (no network or API key needed)
+├── tests/                   92 offline tests (no network or API key needed)
 ├── reports/                 generated reports, charts, model card
 ├── notebooks/01_eda.ipynb   exploratory analysis
 ├── diagrams/                architecture diagram source
@@ -260,12 +284,13 @@ Claude Desktop (`claude_desktop_config.json`):
 pytest
 ```
 
-All 65 tests run offline, with no data download, API key, or network needed. They cover:
+All 92 tests run offline, with no data download, API key, or network needed. They cover:
 - feature leakage, SHAP additivity, and calibration
 - API behavior and prediction locking
 - the MCP tools
 - the agent loop, using a scripted fake Claude client
 - the learner profile and the season tracker
+- the news pipeline, including a check that headlines never reach the AI
 
 CI runs them on every pull request and also builds and smoke-tests the Docker image.
 

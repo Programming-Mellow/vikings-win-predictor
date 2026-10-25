@@ -64,3 +64,34 @@ class Health(BaseModel):
     status: str
     seasons_available: list[int]
     latest_prediction_run: str | None
+
+
+class NewsFact(BaseModel):
+    id: str
+    kind: str = Field(description="Injury, Roster move, Trade, or Coaching")
+    text: str
+    in_model: bool = Field(description="True if the models' features already account for this (key starters ruled Out)")
+    date: str | None = None
+
+
+class NewsHeadline(BaseModel):
+    title: str = Field(description="Exactly as published")
+    link: str
+    source: str
+    published: str | None
+    category: str | None = Field(description="Keyword category (not AI): Injury, Roster move, Trade, Coaching, Suspension")
+
+
+class NewsSource(BaseModel):
+    name: str
+    url: str
+    terms: str
+
+
+class TeamNews(BaseModel):
+    team: str
+    season: int
+    generated_at: str
+    facts: list[NewsFact] = Field(description="From nflverse: this week's injury report, roster moves, trades, coach changes")
+    headlines: list[NewsHeadline] = Field(description="Last 7 days from the allow-listed feeds, newest first")
+    sources: list[NewsSource]

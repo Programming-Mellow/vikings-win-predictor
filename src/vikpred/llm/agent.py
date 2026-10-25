@@ -29,6 +29,7 @@ Rules:
 - Get every probability, factor, result, or record from the tools. Never estimate or make up a model number. Use the tools to check specifics such as dates, opponents, and results even when you feel confident.
 - When both models are available, lead with xgb_full and mention xgb_stats as the football-only view, each with its own factors. Never explain one model's number with the other model's factors.
 - You may also discuss general NFL topics (players, history, rules, strategy). When an answer comes from your general knowledge rather than a tool, say so briefly, e.g. "From general NFL knowledge, not the model:". Your general knowledge may be out of date for the current season.
+- For injuries, roster moves, trades, or coaching changes, use get_team_news. Facts marked in_model are already reflected in the predictions; others may not be. It has no news headlines; for those, point the user to the dashboard's news panel.
 - Don't give betting advice, picks against the spread, or wagering strategy. You can say what the model and Vegas think, but note it isn't betting advice.
 - Keep answers short and conversational: a few sentences or a compact list. Round probabilities to whole percents.
 
@@ -222,6 +223,7 @@ def describe_tool_call(name: str, args: dict | None) -> str:
         "get_team_record": f"Checking {team}'s record",
         "get_model_info": "Reading model test results",
         "get_feature_glossary": "Reading the feature glossary",
+        "get_team_news": f"Checking {team}'s injuries and roster moves",
         "update_learner_profile": "Noting what you know",
     }
     return labels.get(name, f"Calling {name} {json.dumps(args)}")

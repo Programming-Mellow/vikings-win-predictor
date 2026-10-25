@@ -26,6 +26,7 @@ services:
     <<: *vikpred
     command: ["uvicorn", "vikpred.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports: ["8000:8000"]
+    restart: unless-stopped  # come back after a reboot on an always-on host
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -38,6 +39,7 @@ services:
     command: ["streamlit", "run", "app/streamlit_app.py", "--server.address", "0.0.0.0",
               "--server.port", "8501", "--server.headless", "true", "--browser.gatherUsageStats", "false"]
     ports: ["8501:8501"]
+    restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy

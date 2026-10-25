@@ -40,6 +40,10 @@ dev = [
     "seaborn",
 ]
 
+docs = [
+    "diagrams>=0.24",  # regenerate docs/architecture.png (also needs Graphviz)
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

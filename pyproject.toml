@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vikpred"
+version = "0.1.0"
+description = "Weekly Minnesota Vikings win-probability predictions with ML + generative AI explanations."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "nflreadpy>=0.1.5",
+    "polars>=1.0",
+    "pandas>=2.1",
+    "pyarrow>=15",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "jupyter",
+    "nbconvert",
+    "ipykernel",
+    "matplotlib",
+    "seaborn",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

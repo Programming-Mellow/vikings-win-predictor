@@ -5,7 +5,7 @@ Weekly win-probability predictions for the Minnesota Vikings, combining a tradit
 - **ML** produces the number: a calibrated win probability trained on every NFL game since 2010.
 - **Generative AI** (Claude, via an MCP server) explains *why*, using only the model's actual feature contributions, and answers user questions. It never makes up the prediction.
 
-> **Status:** Phase 3 of 7 complete (XGBoost + calibration + SHAP explanations). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
+> **Status:** Phase 4 of 7 complete (FastAPI service + weekly prediction job). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
 
 ## Architecture
 
@@ -32,6 +32,8 @@ python -m vikpred.data.ingest     # downloads 2010-current season (~2 MB on disk
 python -m vikpred.features.build  # pre-game feature table
 python -m vikpred.models.baseline # Phase 2 baselines, writes reports/phase2_*
 python -m vikpred.models.xgb      # Phase 3 XGBoost + SHAP (~1 min), writes reports/phase3_*
+python -m vikpred.serving.job       # weekly: refresh data and predict this season
+uvicorn vikpred.api.main:app       # API at http://localhost:8000/docs
 pytest
 mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # browse experiment runs
 jupyter notebook notebooks/01_eda.ipynb
@@ -94,6 +96,30 @@ XGBoost was tuned with **rolling-origin validation** (train on every season befo
 
 All runs are tracked in **MLflow** (parameters, CV and test metrics, charts).
 
+## Phase 4: prediction API
+
+A **weekly job** refreshes the data, rebuilds features, and stores every game's prediction from both models, along with the SHAP contributions. The **FastAPI service** only reads those stored results, so requests are instant and the models never load in the request path.
+
+```bash
+python -m vikpred.serving.job          # run weekly (e.g. Tuesday after Monday Night Football)
+uvicorn vikpred.api.main:app --reload  # interactive docs at http://localhost:8000/docs
+```
+
+| Endpoint | Returns |
+|---|---|
+| `GET /teams/{team}/next` | Next unplayed game: both models' win probabilities, each with its own top SHAP factors |
+| `GET /games/{game_id}?team=MIN` | Any game, explained from either team's side |
+| `GET /teams/{team}/games?season=2026` | The season schedule with predictions, results, and scores |
+| `GET /teams/{team}/record?live_only=true` | Win-loss record, plus how often the model and Vegas picked the winner, with Brier scores |
+| `GET /model`, `/features`, `/health` | Model versions and test metrics, feature glossary, service status |
+
+Example: `GET /teams/MIN/next` today returns IND @ MIN with **74.3%** (stats + Vegas) and **64.4%** (stats only). The stats-only model's top factors are *recent point-differential edge* (+0.57) and *offensive success-rate edge* (−0.14).
+
+**Design choices:**
+- **Prediction locking.** Once a game is played, its last pre-game prediction is frozen. Predictions made after kickoff are flagged `backfilled`, and `/record?live_only=true` excludes them, so tracked accuracy can't be inflated after the fact.
+- **No guessing.** When Vegas lines aren't posted yet, the stats + Vegas model reports `available: false` with a reason instead of predicting from missing inputs.
+- **Swappable storage.** The job and API use a `PredictionStore` interface (local Parquet today), so S3 or DynamoDB in Phase 7 is one new class.
+
 ## Project layout
 
 ```
@@ -105,9 +131,13 @@ src/vikpred/
   models/baseline.py baselines + logistic regression, time-split evaluation
   models/metrics.py log loss, Brier, calibration error, bootstrap comparison
   models/xgb.py     XGBoost tuning, calibration, SHAP explanations, MLflow logging
+  serving/job.py    weekly prediction job with locking (CLI: python -m vikpred.serving.job)
+  serving/store.py  PredictionStore interface + local Parquet implementation
+  api/main.py       FastAPI app (uvicorn vikpred.api.main:app)
+  api/schemas.py    Pydantic response models
 notebooks/01_eda.ipynb
 reports/            generated Phase 2/3 reports, charts, model card
-tests/              offline unit tests (ingest, leakage, features, metrics, explanations)
+tests/              offline unit tests (ingest, leakage, features, metrics, explanations, API, locking)
 ```
 
 ## Roadmap
@@ -117,7 +147,7 @@ tests/              offline unit tests (ingest, leakage, features, metrics, expl
 | 1 | Data ingest + EDA | ✅ |
 | 2 | Pre-game feature table, logistic-regression baseline vs. Vegas/home baselines | ✅ |
 | 3 | XGBoost + calibration + SHAP, MLflow tracking, model card | ✅ |
-| 4 | FastAPI service + weekly prediction job | |
+| 4 | FastAPI service + weekly prediction job | ✅ |
 | 5 | MCP server + Claude chat assistant in Streamlit | |
 | 6 | Docker, CI, season tracker (predicted vs. actual) | |
 | 7 | AWS deployment via CloudFormation (S3, EventBridge, ECS, Bedrock) | |

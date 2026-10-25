@@ -19,11 +19,14 @@ dependencies = [
     "xgboost>=3.0",
     "shap>=0.48",
     "mlflow>=3.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
+    "httpx",
     "jupyter",
     "nbconvert",
     "ipykernel",

@@ -34,6 +34,31 @@ GAME_FEATURES = ["rest_diff", "div_game", "indoors", "temp", "wind"]
 MARKET_FEATURES = ["spread_line", "total_line", "market_home_prob"]
 DIFF_FEATURES = [f"diff_{f}" for f in TEAM_FEATURES]
 
+# Plain-English names for explanations. `flip` marks features measured from the
+# home team's side, which must be negated to read them from the away team's side.
+FEATURE_LABELS = {
+    "diff_off_epa_ewm": ("Offensive EPA/play edge (recent form)", True),
+    "diff_def_epa_ewm": ("Defensive EPA/play allowed vs. opponent (lower is better)", True),
+    "diff_off_success_ewm": ("Offensive success-rate edge", True),
+    "diff_def_success_ewm": ("Defensive success rate allowed vs. opponent (lower is better)", True),
+    "diff_off_pass_epa_ewm": ("Passing offense EPA edge", True),
+    "diff_def_pass_epa_ewm": ("Pass defense EPA allowed vs. opponent (lower is better)", True),
+    "diff_off_rush_epa_ewm": ("Rushing offense EPA edge", True),
+    "diff_def_rush_epa_ewm": ("Run defense EPA allowed vs. opponent (lower is better)", True),
+    "diff_point_diff_ewm": ("Recent point-differential edge", True),
+    "diff_qb_changed": ("Starting QB change vs. opponent", True),
+    "diff_qb_out": ("QB ruled Out vs. opponent", True),
+    "diff_key_players_out": ("Key starters ruled Out vs. opponent", True),
+    "rest_diff": ("Extra rest days vs. opponent", True),
+    "div_game": ("Division game", False),
+    "indoors": ("Indoor game", False),
+    "temp": ("Temperature (F)", False),
+    "wind": ("Wind (mph)", False),
+    "spread_line": ("Vegas spread (expected margin)", True),
+    "total_line": ("Vegas over/under total", False),
+    "market_logit": ("Vegas moneyline win probability", True),
+}
+
 
 def team_game_stats(sched: pd.DataFrame, epa: pd.DataFrame) -> pd.DataFrame:
     """One row per team per game with offense, defense, and scoring results."""

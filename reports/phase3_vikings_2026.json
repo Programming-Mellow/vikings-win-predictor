@@ -1,0 +1,498 @@
+{
+  "xgb_stats": [
+    {
+      "game_id": "2026_01_GB_MIN",
+      "week": 1,
+      "opponent": "GB",
+      "venue": "home",
+      "win_prob": 0.5864,
+      "vegas_prob": 0.5325,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 10.5634,
+          "impact": 0.5336
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.1556,
+          "impact": -0.1399
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0274,
+          "impact": -0.131
+        },
+        {
+          "feature": "diff_qb_changed",
+          "label": "Starting QB change vs. opponent",
+          "value": 1.0,
+          "impact": -0.0775
+        },
+        {
+          "feature": "diff_off_pass_epa_ewm",
+          "label": "Passing offense EPA edge",
+          "value": -0.3013,
+          "impact": -0.0503
+        }
+      ]
+    },
+    {
+      "game_id": "2026_02_MIN_CHI",
+      "week": 2,
+      "opponent": "CHI",
+      "venue": "away",
+      "win_prob": 0.4302,
+      "vegas_prob": 0.3425,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 2.1108,
+          "impact": 0.288
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0495,
+          "impact": -0.2277
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.1891,
+          "impact": -0.0654
+        },
+        {
+          "feature": "diff_off_pass_epa_ewm",
+          "label": "Passing offense EPA edge",
+          "value": -0.2814,
+          "impact": -0.0389
+        },
+        {
+          "feature": "diff_def_pass_epa_ewm",
+          "label": "Pass defense EPA allowed vs. opponent (lower is better)",
+          "value": -0.4059,
+          "impact": 0.0202
+        }
+      ]
+    },
+    {
+      "game_id": "2026_03_MIN_TB",
+      "week": 3,
+      "opponent": "TB",
+      "venue": "away",
+      "win_prob": 0.5186,
+      "vegas_prob": 0.5043,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 10.9886,
+          "impact": 0.5294
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0378,
+          "impact": -0.2301
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.0025,
+          "impact": 0.0172
+        },
+        {
+          "feature": "diff_key_players_out",
+          "label": "Key starters ruled Out vs. opponent",
+          "value": -1.0,
+          "impact": 0.0084
+        },
+        {
+          "feature": "diff_qb_out",
+          "label": "QB ruled Out vs. opponent",
+          "value": -0.0,
+          "impact": -0.0078
+        }
+      ]
+    },
+    {
+      "game_id": "2026_04_MIA_MIN",
+      "week": 4,
+      "opponent": "MIA",
+      "venue": "home",
+      "win_prob": 0.6488,
+      "vegas_prob": 0.8082,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 20.1495,
+          "impact": 0.5866
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0173,
+          "impact": -0.1129
+        },
+        {
+          "feature": "diff_off_pass_epa_ewm",
+          "label": "Passing offense EPA edge",
+          "value": -0.0883,
+          "impact": -0.0503
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.0164,
+          "impact": -0.0441
+        },
+        {
+          "feature": "indoors",
+          "label": "Indoor game",
+          "value": 1.0,
+          "impact": -0.0203
+        }
+      ]
+    },
+    {
+      "game_id": "2026_05_MIN_NO",
+      "week": 5,
+      "opponent": "NO",
+      "venue": "away",
+      "win_prob": 0.5188,
+      "vegas_prob": 0.5635,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 11.3879,
+          "impact": 0.5616
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0606,
+          "impact": -0.2355
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.0893,
+          "impact": -0.0297
+        },
+        {
+          "feature": "diff_off_pass_epa_ewm",
+          "label": "Passing offense EPA edge",
+          "value": -0.1343,
+          "impact": -0.0244
+        },
+        {
+          "feature": "diff_def_rush_epa_ewm",
+          "label": "Run defense EPA allowed vs. opponent (lower is better)",
+          "value": -0.1899,
+          "impact": 0.0187
+        }
+      ]
+    },
+    {
+      "game_id": "2026_07_IND_MIN",
+      "week": 7,
+      "opponent": "IND",
+      "venue": "home",
+      "win_prob": 0.644,
+      "vegas_prob": 0.7335,
+      "result": null,
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 11.3511,
+          "impact": 0.5683
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.032,
+          "impact": -0.1416
+        },
+        {
+          "feature": "diff_off_epa_ewm",
+          "label": "Offensive EPA/play edge (recent form)",
+          "value": -0.0602,
+          "impact": -0.0478
+        },
+        {
+          "feature": "diff_off_pass_epa_ewm",
+          "label": "Passing offense EPA edge",
+          "value": 0.0068,
+          "impact": -0.041
+        },
+        {
+          "feature": "indoors",
+          "label": "Indoor game",
+          "value": 1.0,
+          "impact": -0.0203
+        }
+      ]
+    }
+  ],
+  "xgb_full": [
+    {
+      "game_id": "2026_01_GB_MIN",
+      "week": 1,
+      "opponent": "GB",
+      "venue": "home",
+      "win_prob": 0.5304,
+      "vegas_prob": 0.5325,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 10.5634,
+          "impact": 0.111
+        },
+        {
+          "feature": "market_logit",
+          "label": "Vegas moneyline win probability",
+          "value": 0.5325,
+          "impact": -0.0535
+        },
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": 1.5,
+          "impact": -0.0535
+        },
+        {
+          "feature": "total_line",
+          "label": "Vegas over/under total",
+          "value": 46.5,
+          "impact": 0.0515
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0274,
+          "impact": -0.051
+        }
+      ]
+    },
+    {
+      "game_id": "2026_02_MIN_CHI",
+      "week": 2,
+      "opponent": "CHI",
+      "venue": "away",
+      "win_prob": 0.3532,
+      "vegas_prob": 0.3425,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": -4.5,
+          "impact": -0.2325
+        },
+        {
+          "feature": "market_logit",
+          "label": "Vegas moneyline win probability",
+          "value": 0.3425,
+          "impact": -0.1092
+        },
+        {
+          "feature": "diff_def_rush_epa_ewm",
+          "label": "Run defense EPA allowed vs. opponent (lower is better)",
+          "value": -0.1692,
+          "impact": 0.0911
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0495,
+          "impact": -0.0835
+        },
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 2.1108,
+          "impact": 0.0741
+        }
+      ]
+    },
+    {
+      "game_id": "2026_03_MIN_TB",
+      "week": 3,
+      "opponent": "TB",
+      "venue": "away",
+      "win_prob": 0.4929,
+      "vegas_prob": 0.5043,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": 1.5,
+          "impact": 0.2542
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0378,
+          "impact": -0.0769
+        },
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 10.9886,
+          "impact": 0.0714
+        },
+        {
+          "feature": "total_line",
+          "label": "Vegas over/under total",
+          "value": 42.5,
+          "impact": -0.0449
+        },
+        {
+          "feature": "diff_def_success_ewm",
+          "label": "Defensive success rate allowed vs. opponent (lower is better)",
+          "value": -0.0814,
+          "impact": -0.0281
+        }
+      ]
+    },
+    {
+      "game_id": "2026_04_MIA_MIN",
+      "week": 4,
+      "opponent": "MIA",
+      "venue": "home",
+      "win_prob": 0.8106,
+      "vegas_prob": 0.8082,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": 10.0,
+          "impact": 0.6228
+        },
+        {
+          "feature": "market_logit",
+          "label": "Vegas moneyline win probability",
+          "value": 0.8082,
+          "impact": 0.4456
+        },
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 20.1495,
+          "impact": 0.1286
+        },
+        {
+          "feature": "total_line",
+          "label": "Vegas over/under total",
+          "value": 38.5,
+          "impact": 0.1028
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0173,
+          "impact": -0.0493
+        }
+      ]
+    },
+    {
+      "game_id": "2026_05_MIN_NO",
+      "week": 5,
+      "opponent": "NO",
+      "venue": "away",
+      "win_prob": 0.5309,
+      "vegas_prob": 0.5635,
+      "result": "W",
+      "top_factors": [
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": 2.5,
+          "impact": 0.2539
+        },
+        {
+          "feature": "market_logit",
+          "label": "Vegas moneyline win probability",
+          "value": 0.5635,
+          "impact": 0.0815
+        },
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 11.3879,
+          "impact": 0.0811
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.0606,
+          "impact": -0.0807
+        },
+        {
+          "feature": "total_line",
+          "label": "Vegas over/under total",
+          "value": 41.5,
+          "impact": -0.0426
+        }
+      ]
+    },
+    {
+      "game_id": "2026_07_IND_MIN",
+      "week": 7,
+      "opponent": "IND",
+      "venue": "home",
+      "win_prob": 0.7426,
+      "vegas_prob": 0.7335,
+      "result": null,
+      "top_factors": [
+        {
+          "feature": "market_logit",
+          "label": "Vegas moneyline win probability",
+          "value": 0.7335,
+          "impact": 0.4486
+        },
+        {
+          "feature": "spread_line",
+          "label": "Vegas spread (expected margin)",
+          "value": 6.5,
+          "impact": 0.3027
+        },
+        {
+          "feature": "diff_point_diff_ewm",
+          "label": "Recent point-differential edge",
+          "value": 11.3511,
+          "impact": 0.1186
+        },
+        {
+          "feature": "diff_off_success_ewm",
+          "label": "Offensive success-rate edge",
+          "value": -0.032,
+          "impact": -0.0811
+        },
+        {
+          "feature": "total_line",
+          "label": "Vegas over/under total",
+          "value": 41.5,
+          "impact": 0.061
+        }
+      ]
+    }
+  ]
+}

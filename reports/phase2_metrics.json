@@ -1,0 +1,103 @@
+{
+  "splits": {
+    "train": [
+      2010,
+      2022
+    ],
+    "valid": [
+      2023
+    ],
+    "test": [
+      2024,
+      2025
+    ],
+    "n_train": 3479,
+    "n_valid": 285,
+    "n_test": 569
+  },
+  "C": {
+    "logreg_stats": 0.001,
+    "logreg_full": 0.1
+  },
+  "test_metrics": {
+    "always_home": {
+      "log_loss": 0.6903452024179214,
+      "brier": 0.2485975001465201,
+      "accuracy": 0.5413005272407733,
+      "ece": 0.017413606659333003
+    },
+    "vegas": {
+      "log_loss": 0.5980858725835057,
+      "brier": 0.20593185243347054,
+      "accuracy": 0.6836555360281195,
+      "ece": 0.027535140635656524
+    },
+    "logreg_stats": {
+      "log_loss": 0.6281494792553346,
+      "brier": 0.219230425925896,
+      "accuracy": 0.6520210896309314,
+      "ece": 0.06395301409802266
+    },
+    "logreg_full": {
+      "log_loss": 0.59831707225279,
+      "brier": 0.20628690680154402,
+      "accuracy": 0.6836555360281195,
+      "ece": 0.04307373550589639
+    }
+  },
+  "log_loss_vs_vegas": {
+    "logreg_stats": {
+      "mean": 0.03006360667182897,
+      "ci_low": 0.011144405838560634,
+      "ci_high": 0.04892548405111194
+    },
+    "logreg_full": {
+      "mean": 0.00023119966928427635,
+      "ci_low": -0.005434290807727593,
+      "ci_high": 0.005853115331011132
+    }
+  },
+  "coefficients": {
+    "logreg_stats": {
+      "diff_point_diff_ewm": 0.1483,
+      "diff_off_success_ewm": 0.1239,
+      "diff_off_epa_ewm": 0.1134,
+      "diff_off_pass_epa_ewm": 0.1062,
+      "diff_qb_out": -0.0605,
+      "diff_def_epa_ewm": -0.058,
+      "diff_def_pass_epa_ewm": -0.0561,
+      "diff_qb_changed": -0.054,
+      "diff_off_rush_epa_ewm": 0.043,
+      "diff_key_players_out": -0.035,
+      "diff_def_rush_epa_ewm": -0.0319,
+      "rest_diff": 0.0317,
+      "temp": -0.0246,
+      "diff_def_success_ewm": -0.0193,
+      "div_game": -0.0141,
+      "indoors": -0.0094,
+      "wind": -0.0067
+    },
+    "logreg_full": {
+      "spread_line": 0.4413,
+      "market_logit": 0.3994,
+      "diff_point_diff_ewm": 0.1467,
+      "diff_off_epa_ewm": -0.1185,
+      "diff_off_success_ewm": 0.0951,
+      "diff_def_success_ewm": 0.0852,
+      "total_line": -0.0607,
+      "diff_def_pass_epa_ewm": 0.0466,
+      "diff_qb_out": -0.0429,
+      "indoors": -0.0335,
+      "div_game": -0.028,
+      "wind": -0.0277,
+      "diff_off_pass_epa_ewm": -0.0274,
+      "diff_key_players_out": -0.0258,
+      "temp": -0.0246,
+      "diff_off_rush_epa_ewm": -0.0233,
+      "diff_def_rush_epa_ewm": -0.0163,
+      "diff_qb_changed": -0.0144,
+      "diff_def_epa_ewm": 0.0089,
+      "rest_diff": 0.0071
+    }
+  }
+}

@@ -5,7 +5,7 @@ Weekly win-probability predictions for the Minnesota Vikings, combining a tradit
 - **ML** produces the number: a calibrated win probability trained on every NFL game since 2010.
 - **Generative AI** (Claude, via an MCP server) explains *why*, using only the model's actual feature contributions, and answers user questions. It never makes up the prediction.
 
-> **Status:** Phase 2 of 7 complete (feature table + baseline models). See the [roadmap](#roadmap).
+> **Status:** Phase 3 of 7 complete (XGBoost + calibration + SHAP explanations). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
 
 ## Architecture
 
@@ -30,8 +30,10 @@ pip install -e ".[dev]"
 
 python -m vikpred.data.ingest     # downloads 2010-current season (~2 MB on disk)
 python -m vikpred.features.build  # pre-game feature table
-python -m vikpred.models.baseline # train + evaluate, writes reports/phase2_*
+python -m vikpred.models.baseline # Phase 2 baselines, writes reports/phase2_*
+python -m vikpred.models.xgb      # Phase 3 XGBoost + SHAP (~1 min), writes reports/phase3_*
 pytest
+mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # browse experiment runs
 jupyter notebook notebooks/01_eda.ipynb
 ```
 
@@ -73,6 +75,25 @@ Evaluated on the **2024-2025 seasons (569 games)** after training on 2010-2022 a
 - Adding the market line matches Vegas (bootstrap 95% CI on the log-loss gap: −0.005 to +0.006), but doesn't beat it. That's the expected result against an efficient market, and it sets the bar for Phase 3.
 - The stats-only model is underconfident (calibration error 0.064 vs. Vegas 0.028); see the [calibration chart](reports/phase2_calibration.png).
 
+## Phase 3 results ([full report](reports/phase3_report.md) · [model card](reports/MODEL_CARD.md))
+
+XGBoost was tuned with **rolling-origin validation** (train on every season before 2019, 2020, … 2023, and predict that season), then tested once on 2024-2025:
+
+| Model | Log loss ↓ | Brier ↓ | Accuracy | Calibration error ↓ |
+|---|---|---|---|---|
+| Vegas | 0.5981 | 0.2059 | 68.4% | 0.028 |
+| LogReg, stats only (Phase 2) | 0.6281 | 0.2192 | 65.2% | 0.064 |
+| **XGBoost, stats only** | 0.6258 | 0.2182 | 65.0% | 0.044 |
+| **XGBoost, stats + Vegas** | **0.5980** | **0.2059** | 67.7% | 0.033 |
+
+- XGBoost improves calibration error by about a third over logistic regression for the stats-only model. With the Vegas line it statistically ties the market (95% CI on the log-loss gap: −0.007 to +0.007).
+- Platt and isotonic calibration were tested on held-out seasons and **didn't help**, so neither is applied.
+- **Every prediction comes with SHAP explanations.** For the 2026 Vikings, the stats-only model's top positive factor each week is recent point differential, and the top negative factor is offensive success rate. That's the same "elite defense, struggling offense" pattern found in the EDA.
+
+![SHAP summary](reports/phase3_shap_xgb_stats.png)
+
+All runs are tracked in **MLflow** (parameters, CV and test metrics, charts).
+
 ## Project layout
 
 ```
@@ -83,9 +104,10 @@ src/vikpred/
   features/build.py pre-game feature table (CLI: python -m vikpred.features.build)
   models/baseline.py baselines + logistic regression, time-split evaluation
   models/metrics.py log loss, Brier, calibration error, bootstrap comparison
+  models/xgb.py     XGBoost tuning, calibration, SHAP explanations, MLflow logging
 notebooks/01_eda.ipynb
-reports/            generated Phase 2 report, metrics, calibration chart
-tests/              offline unit tests (ingest, leakage, features, metrics)
+reports/            generated Phase 2/3 reports, charts, model card
+tests/              offline unit tests (ingest, leakage, features, metrics, explanations)
 ```
 
 ## Roadmap
@@ -94,7 +116,7 @@ tests/              offline unit tests (ingest, leakage, features, metrics)
 |---|---|---|
 | 1 | Data ingest + EDA | ✅ |
 | 2 | Pre-game feature table, logistic-regression baseline vs. Vegas/home baselines | ✅ |
-| 3 | XGBoost + calibration + SHAP, MLflow tracking, model card | |
+| 3 | XGBoost + calibration + SHAP, MLflow tracking, model card | ✅ |
 | 4 | FastAPI service + weekly prediction job | |
 | 5 | MCP server + Claude chat assistant in Streamlit | |
 | 6 | Docker, CI, season tracker (predicted vs. actual) | |

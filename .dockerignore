@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+.env
+.pytest_cache
+**/__pycache__
+**/*.egg-info
+data
+models
+mlruns
+notebooks
+tests

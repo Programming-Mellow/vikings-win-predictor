@@ -1,0 +1,53 @@
+# Run the whole app:
+#   docker compose --profile bootstrap run --rm bootstrap   # first time: download data + train (~2 min)
+#   docker compose up                                        # API on :8000, app on :8501
+#   docker compose --profile job run --rm job               # weekly refresh
+#
+# data/, models/, reports/ and mlruns/ are shared with the host, so a local
+# checkout and the containers see the same predictions.
+
+x-vikpred: &vikpred
+  build: .
+  image: vikings-win-predictor:latest
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    VIKPRED_HOME: /app
+    VIKPRED_API_URL: http://api:8000
+  volumes:
+    - ./data:/app/data
+    - ./models:/app/models
+    - ./reports:/app/reports
+    - ./mlruns:/app/mlruns
+
+services:
+  api:
+    <<: *vikpred
+    command: ["uvicorn", "vikpred.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    <<: *vikpred
+    command: ["streamlit", "run", "app/streamlit_app.py", "--server.address", "0.0.0.0",
+              "--server.port", "8501", "--server.headless", "true", "--browser.gatherUsageStats", "false"]
+    ports: ["8501:8501"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  job:
+    <<: *vikpred
+    profiles: ["job"]
+    command: ["python", "-m", "vikpred.serving.job"]
+
+  bootstrap:
+    <<: *vikpred
+    profiles: ["bootstrap"]
+    command: ["sh", "-c", "python -m vikpred.data.ingest && python -m vikpred.features.build && python -m vikpred.models.xgb && python -m vikpred.serving.job --skip-ingest"]

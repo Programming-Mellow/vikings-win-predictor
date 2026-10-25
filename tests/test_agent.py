@@ -96,7 +96,9 @@ def test_request_shape():
     req = api.requests[0]
     assert req["model"] == "claude-sonnet-5-5"
     assert req["output_config"] == {"effort": "low"}
-    assert req["fallbacks"] == "default" and req["betas"] == ["server-side-fallback-2026-07-01"]
+    assert req["fallbacks"] == "default"
+    assert req["betas"] == ["thinking-display-updates-2026-08-18", "server-side-fallback-2026-07-01"]
+    assert req["thinking"] == {"type": "adaptive", "display": "updates"}
     assert req["cache_control"] == {"type": "ephemeral"}
     assert all(t["eager_input_streaming"] for t in req["tools"])
     assert "tool_choice" not in req  # forced tool choice is a 400 on this model
@@ -105,7 +107,8 @@ def test_request_shape():
 def test_bedrock_config_skips_fallbacks():
     agent, api, _ = make_agent([reply(text("hi"))], LLMConfig("bedrock", "anthropic.claude-sonnet-5-5", False))
     run(agent, "hello")
-    assert "fallbacks" not in api.requests[0] and "betas" not in api.requests[0]
+    assert "fallbacks" not in api.requests[0]
+    assert api.requests[0]["betas"] == ["thinking-display-updates-2026-08-18"]
 
 
 def test_invalid_tool_input_is_rejected_without_calling_tool():

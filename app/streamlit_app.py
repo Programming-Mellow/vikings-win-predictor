@@ -16,9 +16,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from vikpred.llm.agent import ChatAgent, describe_tool_call  # noqa: E402
+from vikpred.llm.insights import explain_game, insights_model  # noqa: E402
 from vikpred.llm.learner import LEVELS, LearnerStore  # noqa: E402
 from vikpred.llm.provider import credentials_available, load_config, make_client  # noqa: E402
 from vikpred.llm.toolbox import MCPToolbox  # noqa: E402
+from vikpred.teams import prediction_headline  # noqa: E402
 from vikpred.tracker import summary, tracker_frame  # noqa: E402
 
 API_URL = os.environ.get("VIKPRED_API_URL", "http://localhost:8000")
@@ -60,12 +62,74 @@ def factor_chart(factors: list[dict]):
     ).properties(height=36 * len(df)))
 
 
+def prediction_banner(game: dict):
+    """One-sentence verdict for the next game, from the most accurate model available.
+
+    The headline renders immediately. Returns a function that fills in Claude's
+    "why" bullets; main() calls it after the rest of the page has drawn, so a
+    first-time LLM call never holds up the dashboard.
+    """
+    if game["win_prob"] is not None:
+        prob, source = game["win_prob"], "the stats + Vegas model"
+    elif game["win_prob_stats"] is not None:
+        prob, source = game["win_prob_stats"], "the stats-only model (Vegas lines aren't posted yet)"
+    else:
+        return None
+    text, tone = prediction_headline(game["team"], game["opponent"], prob)
+    show = {"win": st.success, "loss": st.warning, "tossup": st.info}[tone]
+    icon = {"win": "🏆", "loss": "⚠️", "tossup": "🪙"}[tone]
+    banner, caption = st.empty(), st.empty()
+    context = f"Week {game['week']} · {'home' if game['venue'] == 'home' else 'away'} · based on {source}"
+    with banner.container():
+        show(f"**{text}**", icon=icon)
+    caption.caption(f"{context} · not betting advice")
+
+    def add_reasons():
+        with caption.container():
+            bullets = why_bullets(game)
+        if not bullets:
+            caption.caption(f"{context} · not betting advice")
+            return
+        with banner.container():
+            show(f"**{text}**" + "".join(f"\n- {b}" for b in bullets), icon=icon)
+        caption.caption(f"{context} · reasons written by Claude Haiku from the model's SHAP factors · "
+                        "not betting advice")
+
+    return add_reasons
+
+
+@st.cache_resource(show_spinner=False)
+def insights_client():
+    config = load_config()
+    return (make_client(config), insights_model(config.provider)) if credentials_available(config) else None
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def cached_bullets(_client, model: str, game_key: tuple, game: dict, level: str) -> list[str]:
+    # game_key (game, team, prediction run, level) decides reuse; the client isn't hashed.
+    return explain_game(_client, model, game, level)
+
+
+def why_bullets(game: dict) -> list[str]:
+    """Plain-English reasons for the headline, written by Claude Haiku. Empty without an API key."""
+    resources = insights_client()
+    if resources is None:
+        return []
+    client, model = resources
+    # Read the sidebar selector directly so a level change applies on this same rerun.
+    level = st.session_state.get("level_choice") or get_learner().profile.level
+    key = (game["game_id"], game["team"], game["predicted_at"], level)
+    with st.spinner("Asking Claude why…"):
+        return cached_bullets(client, model, key, game, level)
+
+
 def next_game_section(team: str):
     try:
         game = api_get(f"/teams/{team}/next", top_k=6)
     except httpx.HTTPStatusError as exc:
         st.info(exc.response.json().get("detail", "No upcoming game."))
-        return
+        return None
+    add_reasons = prediction_banner(game)
     where = "vs" if game["venue"] == "home" else "@"
     st.subheader(f"Week {game['week']}: {team} {where} {game['opponent']}")
     st.caption(f"{game['gameday']} · predictions updated {game['predicted_at'][:16].replace('T', ' ')} UTC")
@@ -85,6 +149,7 @@ def next_game_section(team: str):
                 continue
             st.altair_chart(factor_chart(pred["top_factors"]), width="stretch")
             st.caption("Purple bars raise the win chance, gold bars lower it. Values compare the two teams.")
+    return add_reasons
 
 
 def season_section(team: str):
@@ -248,7 +313,7 @@ def chat_sidebar():
 
         level = st.segmented_control(
             "Your football level", options=list(LEVELS), format_func=lambda k: LEVELS[k][0],
-            default=learner.profile.level,
+            default=learner.profile.level, key="level_choice",
             help="Answers adjust to this, and to what the assistant learns you already know.")
         if level and level != learner.profile.level:
             learner.set_level(level)
@@ -284,11 +349,14 @@ def main():
         st.stop()
 
     team = st.selectbox("Team", TEAMS, index=TEAMS.index("MIN"))
-    next_game_section(team)
+    add_reasons = next_game_section(team)
     st.divider()
     season_section(team)
     st.divider()
     tracker_section(team)
+    # Fill in the banner's "why" bullets last, so the LLM call never delays the rest of the page.
+    if add_reasons:
+        add_reasons()
     chat_sidebar()
 
 

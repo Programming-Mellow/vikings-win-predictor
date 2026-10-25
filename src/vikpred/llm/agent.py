@@ -12,6 +12,8 @@ from dataclasses import dataclass
 import anthropic
 import jsonschema
 
+from vikpred.llm import learner as learner_mod
+from vikpred.llm.learner import LearnerStore
 from vikpred.llm.provider import LLMConfig
 
 SYSTEM_PROMPT = """You are the assistant inside the Vikings Win Predictor, a portfolio project that predicts NFL games with machine learning. The default team is the Minnesota Vikings (MIN), but any team works.
@@ -28,17 +30,27 @@ Rules:
 - When both models are available, lead with xgb_full and mention xgb_stats as the football-only view, each with its own factors. Never explain one model's number with the other model's factors.
 - You may also discuss general NFL topics (players, history, rules, strategy). When an answer comes from your general knowledge rather than a tool, say so briefly, e.g. "From general NFL knowledge, not the model:". Your general knowledge may be out of date for the current season.
 - Don't give betting advice, picks against the spread, or wagering strategy. You can say what the model and Vegas think, but note it isn't betting advice.
-- Keep answers short and conversational: a few sentences or a compact list. Round probabilities to whole percents."""
+- Keep answers short and conversational: a few sentences or a compact list. Round probabilities to whole percents.
+
+Growing with the user:
+- The app sends a learner profile as a system message: their level (Beginner, Fan, or Analyst), concepts they know, concepts they're still learning, and interests. It may change during the conversation; always follow the latest one.
+- Match depth to the level. Explain a concept briefly (one or two sentences, with a football example) the first time it comes up if it isn't in their known list; after that, use it without re-explaining.
+- When the user shows they understand a concept, explains it back, or asks a deeper follow-up, record it with update_learner_profile. Also record concepts you're about to explain (as learning) and recurring interests.
+- Make any update_learner_profile call before you write your answer: in the same step as your data lookups, or as your first step if you need no data. Your answer must be the last thing you write in a turn, with no tool calls after it. Never mention the profile or that you recorded anything.
+- Now and then, when it fits naturally, end with one short suggestion of a next idea to explore that builds on what they know (for example, from EPA to success rate, or from win probability to calibration). Skip it for quick factual answers."""
 
 MAX_TOOL_ROUNDS = 8
 MAX_TOKENS = 16000
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# Sonnet 5.5 returns text written between tool calls as "progress update"
+# thinking blocks, empty by default; this beta returns their text so the UI can show it.
+UPDATES_BETA = "thinking-display-updates-2026-08-18"
 
 
 @dataclass
 class Event:
     """Something the UI can render while a turn streams."""
-    kind: str  # "text" | "tool_start" | "tool_end" | "notice" | "error"
+    kind: str  # "text" | "progress" | "tool_start" | "tool_end" | "notice" | "error"
     text: str = ""
     tool: str = ""
     data: dict | None = None
@@ -46,15 +58,21 @@ class Event:
 
 class ChatAgent:
     def __init__(self, client, config: LLMConfig, tools: list[dict],
-                 call_tool: Callable[[str, dict], tuple[str, bool]], effort: str = "low"):
+                 call_tool: Callable[[str, dict], tuple[str, bool]], effort: str = "low",
+                 learner: LearnerStore | None = None):
         self.client = client
         self.config = config
         self.call_tool = call_tool
         self.effort = effort
+        self.learner = learner
+        # The tool list must stay identical for the whole conversation, so the
+        # local profile tool is included from the first request.
+        tools = tools + ([learner_mod.TOOL] if learner else [])
         self._schemas = {t["name"]: t["input_schema"] for t in tools}
         # Tool inputs stream as they're generated; we validate them ourselves below.
         self.tools = [{**t, "eager_input_streaming": True} for t in tools]
         self.history: list[dict] = []
+        self._sent_profile: str | None = None
 
     # -- model call ----------------------------------------------------------------
 
@@ -66,11 +84,14 @@ class ChatAgent:
             tools=self.tools,
             messages=self.history,
             output_config={"effort": self.effort},
+            thinking={"type": "adaptive", "display": "updates"},
             cache_control={"type": "ephemeral"},  # system + tools are identical every turn
+            betas=[UPDATES_BETA],
         )
         if self.config.supports_fallbacks:
             # On a safety-classifier decline, the API retries on a fallback model.
-            kwargs.update(betas=[FALLBACK_BETA], fallbacks="default")
+            kwargs["betas"].append(FALLBACK_BETA)
+            kwargs["fallbacks"] = "default"
         return kwargs
 
     # -- tool execution --------------------------------------------------------------
@@ -84,7 +105,10 @@ class ChatAgent:
             jsonschema.validate(block.input, schema)
         except jsonschema.ValidationError as exc:
             return self._tool_error(block.id, f"Invalid input for {block.name}: {exc.message}")
-        text, is_error = self.call_tool(block.name, block.input)
+        if self.learner and block.name == learner_mod.TOOL["name"]:
+            text, is_error = self.learner.handle_tool(block.input), False
+        else:
+            text, is_error = self.call_tool(block.name, block.input)
         result = {"type": "tool_result", "tool_use_id": block.id, "content": text}
         if is_error:
             result["is_error"] = True
@@ -96,9 +120,33 @@ class ChatAgent:
 
     # -- conversation turn -------------------------------------------------------------
 
+    def _add_user_turn(self, user_text: str) -> None:
+        """Append the user's message, plus the learner profile if it changed since it was last sent.
+
+        The profile can't live in the top-level system prompt: changing that
+        mid-conversation invalidates Claude's earlier thinking blocks. Instead it
+        is appended as a mid-conversation system message right after the user's
+        message, which keeps the history append-only.
+        """
+        profile = self.learner.profile.context_message() if self.learner else None
+        if profile is None or profile == self._sent_profile:
+            self.history.append({"role": "user", "content": user_text})
+            return
+        self._sent_profile = profile
+        if self.config.supports_system_messages:
+            self.history.append({"role": "user", "content": user_text})
+            self.history.append({"role": "system", "content": profile})
+        else:
+            # Providers without mid-conversation system messages get it as a
+            # separate text block in the user turn instead.
+            self.history.append({"role": "user", "content": [
+                {"type": "text", "text": user_text},
+                {"type": "text", "text": f"<app_context>\n{profile}\n</app_context>"},
+            ]})
+
     def respond(self, user_text: str) -> Iterator[Event]:
         """Run one user turn to completion, yielding events as they happen."""
-        self.history.append({"role": "user", "content": user_text})
+        self._add_user_turn(user_text)
         json_retries = 0
 
         for _ in range(MAX_TOOL_ROUNDS):
@@ -107,6 +155,9 @@ class ChatAgent:
                     for event in stream:
                         if event.type == "text":
                             yield Event("text", event.text)
+                        elif event.type == "thinking" and event.thinking:
+                            # Under display "updates", non-empty thinking is a progress note.
+                            yield Event("progress", event.thinking)
                     message = stream.get_final_message()
             except ValueError:
                 # The SDK couldn't parse a streamed tool input at all, so there's no
@@ -171,5 +222,6 @@ def describe_tool_call(name: str, args: dict | None) -> str:
         "get_team_record": f"Checking {team}'s record",
         "get_model_info": "Reading model test results",
         "get_feature_glossary": "Reading the feature glossary",
+        "update_learner_profile": "Noting what you know",
     }
     return labels.get(name, f"Calling {name} {json.dumps(args)}")

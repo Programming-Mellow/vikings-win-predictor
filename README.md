@@ -5,7 +5,9 @@ Weekly win-probability predictions for the Minnesota Vikings, combining a tradit
 - **ML** produces the number: a calibrated win probability trained on every NFL game since 2010.
 - **Generative AI** (Claude, via an MCP server) explains *why*, using only the model's actual feature contributions, and answers user questions. It never makes up the prediction.
 
-> **Status:** Phase 5 of 7 complete (MCP server + Claude chat assistant + Streamlit app). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
+> **Status:** Phase 6 of 7 complete (adaptive assistant, season tracker, Docker, CI). See the [model card](reports/MODEL_CARD.md) and the [roadmap](#roadmap).
+
+[![CI](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/Programming-Mellow/vikings-win-predictor/actions/workflows/ci.yml)
 
 ## Architecture
 
@@ -22,6 +24,16 @@ nflreadpy ──► ingest (polars) ──► data/raw/*.parquet
 Everything runs locally; Phase 7 maps each piece to AWS (S3, EventBridge, ECS/App Runner, Bedrock).
 
 ## Quick start
+
+**With Docker** (copy `.env.example` to `.env` and add your Anthropic key for the chat):
+
+```bash
+docker compose --profile bootstrap run --rm bootstrap   # first time: download data + train (~2 min)
+docker compose up                                        # API :8000, app :8501
+docker compose --profile job run --rm job               # weekly refresh
+```
+
+**Without Docker:**
 
 ```bash
 python -m venv .venv
@@ -161,6 +173,23 @@ For Claude Desktop, add to `claude_desktop_config.json`:
 - Tool inputs stream as they're generated and are validated against each tool's JSON schema before they run. A tool call cut off at the length limit is never run.
 - `LLM_PROVIDER=bedrock` switches to Amazon Bedrock with no code changes (Phase 7).
 
+## Phase 6: an assistant that grows with you, season tracker, Docker, CI
+
+**Adaptive assistant.** Answers match your football knowledge and get more advanced as it grows:
+- **Level selector** (Beginner / Fan / Analyst) in the sidebar sets the baseline depth.
+- **Learned profile:** Claude records concepts you've shown you understand, concepts it has introduced, and your interests, through a local `update_learner_profile` tool. It's saved to `data/learner_profile.json` (git-ignored), and you can view or reset it from the sidebar.
+- **Teaches as it goes:** a new term (EPA, success rate, SHAP, Brier score…) gets a one- or two-sentence explanation the first time. After that it's used freely, and answers sometimes end with a suggested next idea to explore.
+- **Why the profile isn't in the system prompt:** Claude Sonnet 5.5 rejects requests whose system prompt changed mid-conversation, because its thinking blocks are tied to the exact history that produced them. So the profile is appended as a **mid-conversation system message** only when it changes, and the history stays append-only.
+- **Progress notes:** Sonnet 5.5 returns text written between tool calls as "progress update" thinking blocks. The agent requests `display: "updates"` and shows them as status lines, and the prompt has Claude finish tool calls before it writes the answer.
+
+**Chat UI.** The input is pinned at the top of the sidebar. The conversation scrolls in its own panel below, newest exchange first.
+
+**Season tracker.** For each played game: the model's and Vegas's pre-game calls against the result, picks correct, and running Brier scores, with a *live predictions only* toggle that excludes backfilled calls.
+
+**Docker.** One image (`Dockerfile`) runs every service through `docker-compose.yml`: `api`, `app`, plus on-demand `bootstrap` (first-time data + training) and `job` (weekly refresh). `data/`, `models/`, `reports/` and `mlruns/` are shared with the host. `VIKPRED_HOME` tells the installed package where the project lives.
+
+**CI.** GitHub Actions (`.github/workflows/ci.yml`) runs the full offline test suite and builds and smoke-tests the Docker image on every PR and push to `main`.
+
 ## Project layout
 
 ```
@@ -180,10 +209,13 @@ src/vikpred/
   llm/agent.py      Claude chat loop with MCP tools
   llm/toolbox.py    sync MCP client for Streamlit
   llm/provider.py   Anthropic / Bedrock client config
+  llm/learner.py    learner profile + update_learner_profile tool
+  tracker.py        season tracker math (predictions vs. results, running Brier)
 app/streamlit_app.py  dashboard + chat UI
 notebooks/01_eda.ipynb
 reports/            generated Phase 2/3 reports, charts, model card
-tests/              offline unit tests (ingest, leakage, features, metrics, explanations, API, locking, MCP, agent)
+tests/              offline unit tests (ingest, leakage, features, metrics, explanations, API, locking, MCP, agent, learner, tracker)
+Dockerfile, docker-compose.yml, .github/workflows/ci.yml
 ```
 
 ## Roadmap
@@ -195,5 +227,5 @@ tests/              offline unit tests (ingest, leakage, features, metrics, expl
 | 3 | XGBoost + calibration + SHAP, MLflow tracking, model card | ✅ |
 | 4 | FastAPI service + weekly prediction job | ✅ |
 | 5 | MCP server + Claude chat assistant in Streamlit | ✅ |
-| 6 | Docker, CI, season tracker (predicted vs. actual) | |
+| 6 | Adaptive assistant, pinned chat, season tracker, Docker, CI | ✅ |
 | 7 | AWS deployment via CloudFormation (S3, EventBridge, ECS, Bedrock) | |

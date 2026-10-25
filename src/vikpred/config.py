@@ -1,10 +1,13 @@
 """Project-wide settings: paths, seasons, and the team we care about."""
 
+import os
 from pathlib import Path
 
 import nflreadpy as nfl
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# In a source checkout the project root is two levels above this package. An
+# installed package (e.g. in Docker) can't find it that way, so VIKPRED_HOME overrides it.
+PROJECT_ROOT = Path(os.environ.get("VIKPRED_HOME") or Path(__file__).resolve().parents[2])
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"

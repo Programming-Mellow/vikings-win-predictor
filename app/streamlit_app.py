@@ -5,6 +5,7 @@ Run (with the API running on :8000):
 """
 
 import os
+import re
 from pathlib import Path
 
 import altair as alt
@@ -16,11 +17,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from vikpred.llm.agent import ChatAgent, describe_tool_call  # noqa: E402
-from vikpred.llm.insights import explain_game, insights_model  # noqa: E402
+from vikpred.llm.insights import explain_game, insights_model, tag_facts  # noqa: E402
 from vikpred.llm.learner import LEVELS, LearnerStore  # noqa: E402
 from vikpred.llm.provider import credentials_available, load_config, make_client  # noqa: E402
 from vikpred.llm.toolbox import MCPToolbox  # noqa: E402
-from vikpred.teams import prediction_headline  # noqa: E402
+from vikpred.teams import full_name, prediction_headline  # noqa: E402
 from vikpred.tracker import summary, tracker_frame  # noqa: E402
 
 API_URL = os.environ.get("VIKPRED_API_URL", "http://localhost:8000")
@@ -123,13 +124,87 @@ def why_bullets(game: dict) -> list[str]:
         return cached_bullets(client, model, key, game, level)
 
 
+def md_escape(text: str) -> str:
+    """Escape Markdown (and Streamlit's $math$ and :emoji: syntax) so a headline renders exactly as written."""
+    return re.sub(r"([\\`*_{}\[\]()#+!|$<>~:])", r"\\\1", text)
+
+
+@st.cache_data(ttl=24 * 3600, show_spinner=False)
+def cached_fact_tags(_client, model: str, key: tuple, team: str, opponent: str | None,
+                     facts: list[dict], level: str) -> dict:
+    # key (team, news run, opponent, level) decides reuse; the client isn't hashed.
+    return tag_facts(_client, model, team, opponent, facts, level)
+
+
+def news_panel(team: str, opponent: str | None):
+    """This week's facts and headlines for the selected team.
+
+    Draws right away; returns a function that adds Claude Haiku's impact tags to the
+    nflverse facts afterwards. Headlines are never sent to the model: their
+    publishers' terms don't allow AI processing.
+    """
+    try:
+        news = api_get(f"/teams/{team}/news")
+    except httpx.HTTPError:
+        st.caption("📰 Team news appears here after the daily job runs.")
+        return None
+    slot = st.empty()
+
+    def draw(tags: dict):
+        impact_rank = {"hurts": 0, "helps": 0, "neutral": 1, None: 2}
+        facts = sorted(news["facts"], key=lambda f: impact_rank[tags.get(f["id"], {}).get("impact")])
+        with slot.container(border=True):
+            st.markdown(f"**📰 This week: {full_name(team)}**")
+            for f in facts:
+                tag = tags.get(f["id"])
+                icon = {"helps": "🟢", "hurts": "🔴", "neutral": "⚪"}.get(tag["impact"] if tag else None, "▫️")
+                line = f"{icon} **{f['kind']}** · {md_escape(f['text'])} · " \
+                       f"`{'✓ in model' if f['in_model'] else '⚠ not in model'}`"
+                if tag and tag["impact"] != "neutral":
+                    color, label = ("green", "may help") if tag["impact"] == "helps" else ("red", "may hurt")
+                    line += f"  \n:{color}[**{label}:**] {md_escape(tag['note'])}"
+                elif tag:
+                    line += f"  \n_{md_escape(tag['note'])}_"
+                st.markdown(line)
+            if not facts:
+                st.caption("No injury designations, roster moves, trades, or coaching changes yet this week. "
+                           "Injury reports usually start Wednesday.")
+            if news["headlines"]:
+                st.markdown("**Headlines**")
+                for h in news["headlines"][:6]:
+                    when = h["published"][5:10].replace("-", "/") if h["published"] else ""
+                    badge = f" :orange-badge[{h['category']}]" if h["category"] else ""
+                    st.markdown(f"- [{md_escape(h['title'])}]({h['link']}) · {h['source']} · {when}{badge}")
+            sources = ", ".join(s["name"] for s in news["sources"] if s["name"] != "nflverse")
+            st.caption(f"Facts from nflverse{' · impact tags by Claude Haiku' if tags else ''} · "
+                       f"headlines shown as published by {sources}, never processed by AI · "
+                       f"updated {news['generated_at'][:16].replace('T', ' ')} UTC")
+
+    draw({})
+
+    def add_tags():
+        resources = insights_client()
+        if resources is None or not news["facts"]:
+            return
+        client, model = resources
+        level = st.session_state.get("level_choice") or get_learner().profile.level
+        key = (team, news["generated_at"], opponent, level)
+        tags = cached_fact_tags(client, model, key, team, opponent, news["facts"], level)
+        if tags:
+            draw(tags)
+
+    return add_tags
+
+
 def next_game_section(team: str):
     try:
         game = api_get(f"/teams/{team}/next", top_k=6)
     except httpx.HTTPStatusError as exc:
         st.info(exc.response.json().get("detail", "No upcoming game."))
-        return None
+        add_tags = news_panel(team, None)
+        return add_tags
     add_reasons = prediction_banner(game)
+    add_tags = news_panel(team, game["opponent"])
     where = "vs" if game["venue"] == "home" else "@"
     st.subheader(f"Week {game['week']}: {team} {where} {game['opponent']}")
     st.caption(f"{game['gameday']} · predictions updated {game['predicted_at'][:16].replace('T', ' ')} UTC")
@@ -149,7 +224,13 @@ def next_game_section(team: str):
                 continue
             st.altair_chart(factor_chart(pred["top_factors"]), width="stretch")
             st.caption("Purple bars raise the win chance, gold bars lower it. Values compare the two teams.")
-    return add_reasons
+
+    def finish():
+        for step in (add_reasons, add_tags):
+            if step:
+                step()
+
+    return finish
 
 
 def season_section(team: str):
@@ -349,14 +430,14 @@ def main():
         st.stop()
 
     team = st.selectbox("Team", TEAMS, index=TEAMS.index("MIN"))
-    add_reasons = next_game_section(team)
+    finish_llm_extras = next_game_section(team)
     st.divider()
     season_section(team)
     st.divider()
     tracker_section(team)
-    # Fill in the banner's "why" bullets last, so the LLM call never delays the rest of the page.
-    if add_reasons:
-        add_reasons()
+    # Fill in Claude's bullets and news tags last, so LLM calls never delay the rest of the page.
+    if finish_llm_extras:
+        finish_llm_extras()
     chat_sidebar()
 
 

@@ -29,7 +29,7 @@ def wired(monkeypatch):
 def test_all_tools_registered():
     names = {t.name for t in asyncio.run(server.server.list_tools())}
     assert names == {"get_next_game", "get_game", "get_team_schedule", "get_team_record",
-                     "get_model_info", "get_feature_glossary"}
+                     "get_team_news", "get_model_info", "get_feature_glossary"}
 
 
 def test_next_game_tool(wired):

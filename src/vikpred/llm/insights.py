@@ -37,6 +37,62 @@ SCHEMA = {
 }
 
 
+FACTS_PROMPT = """You tag NFL team news for a win-probability dashboard.
+
+You get one team's facts for this week (from the official injury report and roster data) and its next game. For each fact, judge whether it is likely to help, hurt, or not matter for that team's chances in that game, and write one short reason (at most about 15 words).
+- "in_model": true means the prediction already counts it (key starters ruled Out); say so briefly when relevant.
+- Judge from the position and the move itself: moves to or from the practice squad are usually "neutral"; a QB, or several starters at one position, ruled Out usually "hurts".
+- "Reserve list" can mean injured reserve, PUP, or a suspension; say "reserve list", never guess which.
+- Use only the facts given. Don't call a player a starter, backup, or star, and don't add players, injuries, or news that aren't listed; your background knowledge may be out of date. No betting advice."""
+
+FACTS_SCHEMA = {
+    "type": "object",
+    "properties": {"tags": {"type": "array", "items": {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "impact": {"type": "string", "enum": ["helps", "hurts", "neutral"]},
+                       "note": {"type": "string"}},
+        "required": ["id", "impact", "note"], "additionalProperties": False}}},
+    "required": ["tags"],
+    "additionalProperties": False,
+}
+
+
+def tag_facts(client, model: str, team: str, opponent: str | None, facts: list[dict],
+              level: str = "fan") -> dict[str, dict]:
+    """Impact tags for nflverse facts, keyed by fact id. Only nflverse data is sent; never headlines.
+
+    Unknown ids and malformed tags are dropped, so the model can only label facts
+    it was given. Returns {} if the call fails or is declined.
+    """
+    if not facts:
+        return {}
+    level_name, level_desc = LEVELS.get(level, LEVELS["fan"])
+    payload = {"team": full_name(team), "next_opponent": full_name(opponent) if opponent else None,
+               "facts": [{k: f[k] for k in ("id", "kind", "text", "in_model")} for f in facts]}
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=3000,
+            system=FACTS_PROMPT,
+            messages=[{"role": "user", "content": f"Reader's level: {level_name}. {level_desc}\n\n"
+                                                  f"{json.dumps(payload, indent=1)}"}],
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": FACTS_SCHEMA}},
+        )
+    except anthropic.APIError:
+        return {}
+    if response.stop_reason in ("refusal", "max_tokens"):
+        return {}
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    try:
+        tags = json.loads(text)["tags"]
+    except (ValueError, KeyError, TypeError):
+        return {}
+    known = {f["id"] for f in facts}
+    return {t["id"]: {"impact": t["impact"], "note": t["note"].strip()} for t in tags
+            if isinstance(t, dict) and t.get("id") in known and t.get("impact") in ("helps", "hurts", "neutral")
+            and isinstance(t.get("note"), str)}
+
+
 def insights_model(provider: str) -> str:
     default = "anthropic.claude-haiku-5-5" if provider == "bedrock" else "claude-haiku-5-5"
     return os.environ.get("LLM_INSIGHTS_MODEL", default)

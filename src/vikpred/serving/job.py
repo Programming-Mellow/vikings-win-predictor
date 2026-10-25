@@ -12,6 +12,7 @@ Usage:
     python -m vikpred.serving.job                 # current season
     python -m vikpred.serving.job --season 2025   # any season (all backfilled)
     python -m vikpred.serving.job --skip-ingest   # don't re-download; still rebuilds features
+    python -m vikpred.serving.job --no-news       # skip team news (feeds + nflverse roster moves)
 """
 
 import argparse
@@ -29,6 +30,7 @@ from vikpred.data import ingest
 from vikpred.features import build
 from vikpred.models import baseline
 from vikpred.models.xgb import WinModel
+from vikpred.news import collect as news
 from vikpred.serving.store import LocalParquetStore, PredictionStore
 
 log = logging.getLogger(__name__)
@@ -105,7 +107,8 @@ def merge_with_existing(new: pd.DataFrame, existing: pd.DataFrame, now: str) -> 
     return new
 
 
-def run(season: int | None = None, store: PredictionStore | None = None, skip_ingest: bool = False) -> pd.DataFrame:
+def run(season: int | None = None, store: PredictionStore | None = None, skip_ingest: bool = False,
+        collect_news: bool = True) -> pd.DataFrame:
     season = season or current_season()
     store = store or LocalParquetStore()
     if not skip_ingest:
@@ -119,6 +122,12 @@ def run(season: int | None = None, store: PredictionStore | None = None, skip_in
     store.save(season, merged)
     log.info("season %d: %d games, %d with market predictions, %d locked/backfilled",
              season, len(merged), merged.xgb_full_home_prob.notna().sum(), merged.backfilled.sum())
+    if collect_news:
+        # News is extra context: if it fails, the predictions above are already saved.
+        try:
+            news.run(season)
+        except Exception:
+            log.exception("news collection failed; predictions were saved")
     return merged
 
 
@@ -126,9 +135,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--season", type=int, default=None)
     parser.add_argument("--skip-ingest", action="store_true")
+    parser.add_argument("--no-news", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    run(args.season, skip_ingest=args.skip_ingest)
+    run(args.season, skip_ingest=args.skip_ingest, collect_news=not args.no_news)
 
 
 if __name__ == "__main__":

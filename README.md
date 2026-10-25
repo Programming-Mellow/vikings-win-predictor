@@ -5,7 +5,7 @@ Weekly win-probability predictions for the Minnesota Vikings, combining a tradit
 - **ML** produces the number: a calibrated win probability trained on every NFL game since 2010.
 - **Generative AI** (Claude, via an MCP server) explains *why*, using only the model's actual feature contributions, and answers user questions. It never makes up the prediction.
 
-> **Status:** Phase 4 of 7 complete (FastAPI service + weekly prediction job). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
+> **Status:** Phase 5 of 7 complete (MCP server + Claude chat assistant + Streamlit app). See the [model card](reports/MODEL_CARD.md). See the [roadmap](#roadmap).
 
 ## Architecture
 
@@ -34,6 +34,7 @@ python -m vikpred.models.baseline # Phase 2 baselines, writes reports/phase2_*
 python -m vikpred.models.xgb      # Phase 3 XGBoost + SHAP (~1 min), writes reports/phase3_*
 python -m vikpred.serving.job       # weekly: refresh data and predict this season
 uvicorn vikpred.api.main:app       # API at http://localhost:8000/docs
+streamlit run app/streamlit_app.py # dashboard + chat at http://localhost:8501
 pytest
 mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db   # browse experiment runs
 jupyter notebook notebooks/01_eda.ipynb
@@ -120,6 +121,46 @@ Example: `GET /teams/MIN/next` today returns IND @ MIN with **74.3%** (stats + V
 - **No guessing.** When Vegas lines aren't posted yet, the stats + Vegas model reports `available: false` with a reason instead of predicting from missing inputs.
 - **Swappable storage.** The job and API use a `PredictionStore` interface (local Parquet today), so S3 or DynamoDB in Phase 7 is one new class.
 
+## Phase 5: Claude assistant over MCP
+
+```
+Streamlit page ──HTTP──► FastAPI ◄──HTTP── MCP server (6 tools) ◄──stdio── MCP client ◄── Claude Sonnet 5.5
+   dashboard                                                                      chat sidebar
+```
+
+- **MCP server** (`vikpred.mcp_server.server`) exposes the API as tools: `get_next_game`, `get_game`, `get_team_schedule`, `get_team_record`, `get_model_info`, `get_feature_glossary`. Any MCP client can use it, not just this app.
+- **Chat agent** (`vikpred.llm.agent`): Claude Sonnet 5.5 with streamed replies, calling the MCP tools. Every number it quotes comes from a tool. It labels general NFL knowledge as such and declines betting advice. Each model's probability is explained with that model's own SHAP factors.
+- **Streamlit app** (`app/streamlit_app.py`): the next-game card (stats + Vegas model, stats-only model, Vegas), a "why" chart per model, the season table with results and live-call flags, the model vs. Vegas record, and the chat in the sidebar.
+
+**Setup:** copy `.env.example` to `.env` and add your `ANTHROPIC_API_KEY` (`.env` is git-ignored). Without a key the dashboard still works, and the chat explains how to turn it on.
+
+```bash
+uvicorn vikpred.api.main:app          # terminal 1
+streamlit run app/streamlit_app.py    # terminal 2
+```
+
+**Use the tools from Claude Code or Claude Desktop** (with the API running):
+
+```bash
+claude mcp add vikings-predictor -- .venv/Scripts/python -m vikpred.mcp_server.server
+```
+
+For Claude Desktop, add to `claude_desktop_config.json`:
+
+```json
+{"mcpServers": {"vikings-predictor": {
+  "command": "<repo>/.venv/Scripts/python.exe",
+  "args": ["-m", "vikpred.mcp_server.server"],
+  "env": {"VIKPRED_API_URL": "http://localhost:8000"}}}}
+```
+
+**Implementation notes:**
+- Effort is `low`, the recommended chat setting, for fast, inexpensive replies. The system prompt and tool definitions are prompt-cached.
+- Server-side refusal fallback (`fallbacks: "default"`) retries a wrongly declined harmless question on a fallback model.
+- The conversation history is append-only, as Claude Sonnet 5.5 requires, so earlier turns are never edited.
+- Tool inputs stream as they're generated and are validated against each tool's JSON schema before they run. A tool call cut off at the length limit is never run.
+- `LLM_PROVIDER=bedrock` switches to Amazon Bedrock with no code changes (Phase 7).
+
 ## Project layout
 
 ```
@@ -135,9 +176,14 @@ src/vikpred/
   serving/store.py  PredictionStore interface + local Parquet implementation
   api/main.py       FastAPI app (uvicorn vikpred.api.main:app)
   api/schemas.py    Pydantic response models
+  mcp_server/server.py  MCP tools over the API (python -m vikpred.mcp_server.server)
+  llm/agent.py      Claude chat loop with MCP tools
+  llm/toolbox.py    sync MCP client for Streamlit
+  llm/provider.py   Anthropic / Bedrock client config
+app/streamlit_app.py  dashboard + chat UI
 notebooks/01_eda.ipynb
 reports/            generated Phase 2/3 reports, charts, model card
-tests/              offline unit tests (ingest, leakage, features, metrics, explanations, API, locking)
+tests/              offline unit tests (ingest, leakage, features, metrics, explanations, API, locking, MCP, agent)
 ```
 
 ## Roadmap
@@ -148,6 +194,6 @@ tests/              offline unit tests (ingest, leakage, features, metrics, expl
 | 2 | Pre-game feature table, logistic-regression baseline vs. Vegas/home baselines | ✅ |
 | 3 | XGBoost + calibration + SHAP, MLflow tracking, model card | ✅ |
 | 4 | FastAPI service + weekly prediction job | ✅ |
-| 5 | MCP server + Claude chat assistant in Streamlit | |
+| 5 | MCP server + Claude chat assistant in Streamlit | ✅ |
 | 6 | Docker, CI, season tracker (predicted vs. actual) | |
 | 7 | AWS deployment via CloudFormation (S3, EventBridge, ECS, Bedrock) | |
